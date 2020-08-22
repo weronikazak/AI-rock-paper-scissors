@@ -3,14 +3,29 @@ from pygame.locals import *
 import cv2
 import numpy as np
 import sys
+import os
 from time import sleep
 import random
 import tensorflow as tf
+from utils import visualization_utils as viz_utils
 
 # MODEL VARIABLES
-hand_top, hand_right, hand_bottom, hand_left = 150, 250, 400, 0
-model = tf.keras.models.load_model("RPS.model")
-IMG_SIZE = 50
+detect_fn = tf.saved_model.load('../tensorflow_object_detection_api/inference_graph/saved_model')
+
+# category_index = {
+#     1: {'id': 1, 'name': 'hand'},
+#     2: {'id': 2, 'name': 'hand'},
+#     3: {'id': 3, 'name': 'hand'},
+#     4: {'id': 4, 'name': 'hand'},
+#     5: {'id': 5, 'name': 'hand'}
+# }
+category_index = {
+    1: {'id': 1, 'name': 'rock'},
+    2: {'id': 2, 'name': 'paper'},
+    3: {'id': 3, 'name': 'scissors'},
+    4: {'id': 4, 'name': 'rock'},
+    5: {'id': 5, 'name': 'quit'}
+}
 
 # SCREEN
 camera = cv2.VideoCapture(0)
@@ -48,7 +63,7 @@ green = (0, 255, 0)
 
 
 # GAME VARIABLES
-SIGNS = ["rock", "paper", "scissors", "quit", "none"]
+SIGNS = ["rock", "paper", "scissors", "quit", "other"]
 
 GAME_ON = True
 START_GAME = False
@@ -57,7 +72,7 @@ USER_POINTS, COMPUTER_POINTS = 0, 0
 
 w, h = 100, 100
 comp_center_coords = (170, h//2 - 80)
-computer_choice, user_choice = "none", "paper"
+computer_choice, user_choice = "other", "paper"
 
 countdown_started = False
 
@@ -85,7 +100,7 @@ def show_computer_choice():
 
 def show_points():
 	screen.blit(results_img, (0, h-50))
-	count = font.render(f"{COMPUTER_POINTS}                   {USER_POINTS}", False, white)
+	count = font.render(f"{COMPUTER_POINTS}                 {USER_POINTS}", False, white)
 	screen.blit(count, (80, h-40))
 
 
@@ -102,7 +117,7 @@ def compare_signs(user_sign, comp_sign, GAME_ON, user_points, comp_points):
     if user_sign == "quit":
         verdict = "YOU QUITED"
         GAME_ON = False
-    elif user_sign == "none":
+    elif user_sign == "other":
         comp_points += 1
         verdict = "POINT FOR PC!"
     elif user_sign == comp_sign:
@@ -140,13 +155,40 @@ def compare_signs(user_sign, comp_sign, GAME_ON, user_points, comp_points):
     return GAME_ON, user_points, comp_points, font.render(verdict, False, color)
 
 
-while GAME_ON:
+def load_image_into_numpy_array(image):
+  (im_height, im_width) = image.shape[:2]
+  return np.array(image).reshape(
+      (im_height, im_width, 3)).astype(np.uint8)
 
+
+def detect_hand(frame):
+    frame_np = load_image_into_numpy_array(frame)
+    input_tensor = np.expand_dims(frame_np, 0)
+    detections = detect_fn(input_tensor)
+    viz_utils.visualize_boxes_and_labels_on_image_array(
+    	frame_np,
+    	detections['detection_boxes'][0].numpy(),
+    	detections['detection_classes'][0].numpy().astype(np.int32),
+    	detections['detection_scores'][0].numpy(),
+    	category_index,
+    	use_normalized_coordinates=True,
+    	max_boxes_to_draw=1,
+    	min_score_thresh=.4,
+    	skip_scores=True,
+    	skip_labels=True,
+    	agnostic_mode=False
+    	)
+
+    user_choice = category_index[detections['detection_classes'][0].numpy().astype(np.int32)[1]]
+    return frame_np, user_choice["name"]
+
+
+while GAME_ON:
 	ret, frame = camera.read()
+	if START_GAME:
+		frame, user_choice = detect_hand(frame)
 
 	screen.fill([4, 47, 102])
-	cv2.rectangle(frame, (hand_left, hand_top), (hand_right, hand_bottom), (0, 255, 0), 2)
-	hand_frame = frame[hand_top:hand_bottom, hand_left:hand_right]
 
 	frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 	h, w  = frame.shape[:2]
@@ -164,9 +206,9 @@ while GAME_ON:
 		screen.blit(start_game2, (100, h-100))
 	else:
 		show_points()
-		hand_frame, user_choice = guess_user_choice(hand_frame)
+		# hand_frame, user_choice = guess_user_choice(hand_frame)
 		user_choice_text = font.render(user_choice, False, white)
-		screen.blit(user_choice_text, (300, 50))
+		screen.blit(user_choice_text, (400, 30))
 
 		if not countdown_started:
 			start_ticks=pygame.time.get_ticks()
@@ -186,8 +228,6 @@ while GAME_ON:
 
 
 	pygame.display.update()
-
-	cv2.imshow("hand", hand_frame)
 
 	for event in pygame.event.get():
 		if event.type == KEYDOWN:
