@@ -7,7 +7,8 @@ from time import sleep
 import random
 import tensorflow as tf
 
-hand_top, hand_right, hand_bottom, hand_left = 150, 600, 400, 350
+# MODEL VARIABLES
+hand_top, hand_right, hand_bottom, hand_left = 150, 250, 400, 0
 model = tf.keras.models.load_model("RPS.model")
 IMG_SIZE = 50
 
@@ -37,12 +38,6 @@ results_img =  pygame.transform.scale(results_img, (1000-640, 50))
 font = pygame.font.Font('freesansbold.ttf', 32)
 countdown_font = pygame.font.Font('freesansbold.ttf', 50)
 
-SIGNS = ["rock", "paper", "scissors", "quit", "none"]
-
-GAME_ON = True
-START_GAME = False
-ROUND = 1
-USER_POINTS, COMPUTER_POINTS = 0, 0
 
 # COLORS
 white = (255, 255, 255)
@@ -50,6 +45,15 @@ black = (0, 0, 0)
 gray = (220, 220, 220)
 red = (255, 0, 0)
 green = (0, 255, 0)
+
+
+# GAME VARIABLES
+SIGNS = ["rock", "paper", "scissors", "quit", "none"]
+
+GAME_ON = True
+START_GAME = False
+ROUND = 1
+USER_POINTS, COMPUTER_POINTS = 0, 0
 
 w, h = 100, 100
 comp_center_coords = (170, h//2 - 80)
@@ -85,14 +89,13 @@ def show_points():
 	screen.blit(count, (80, h-40))
 
 
-
 def guess_user_choice(hand):
     hand = cv2.cvtColor(hand, cv2.COLOR_RGB2GRAY)
     r, hand_thresh = cv2.threshold(hand, 90, 255, cv2.THRESH_BINARY_INV)
     hand = cv2.resize(hand, (IMG_SIZE, IMG_SIZE))
     hand = hand.reshape(-1, IMG_SIZE, IMG_SIZE, 1)
     prediction = model.predict(hand)
-    return SIGNS[np.argmax(prediction)]
+    return hand_thresh, SIGNS[np.argmax(prediction)]
 
 
 def compare_signs(user_sign, comp_sign, GAME_ON, user_points, comp_points):
@@ -137,62 +140,63 @@ def compare_signs(user_sign, comp_sign, GAME_ON, user_points, comp_points):
     return GAME_ON, user_points, comp_points, font.render(verdict, False, color)
 
 
-try:
-	while GAME_ON:
+while GAME_ON:
 
-		ret, frame = camera.read()
+	ret, frame = camera.read()
 
-		screen.fill([4, 47, 102])
-		cv2.rectangle(frame, (hand_left, hand_top), (hand_right, hand_bottom), (0, 255, 0), 2)
-		hand_frame = frame[hand_top:hand_bottom, hand_left:hand_right]
+	screen.fill([4, 47, 102])
+	cv2.rectangle(frame, (hand_left, hand_top), (hand_right, hand_bottom), (0, 255, 0), 2)
+	hand_frame = frame[hand_top:hand_bottom, hand_left:hand_right]
 
-		frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-		h, w  = frame.shape[:2]
-		frame = np.rot90(frame)
-		frame = pygame.surfarray.make_surface(frame)
-		screen.blit(frame, (1000 - w,0))
-		screen.blit(computer_img, ( (750 - w) // 2,100))
+	frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+	h, w  = frame.shape[:2]
+	frame = np.rot90(frame)
+	frame = pygame.surfarray.make_surface(frame)
+	screen.blit(frame, (1000 - w,0))
+	screen.blit(computer_img, ( (750 - w) // 2,100))
 
-		if not START_GAME:
-			start_game1 = font.render('Press any key', False, white)
-			smile = countdown_font.render(":)", False, white)
-			start_game2 = font.render('to START', False, white)
-			screen.blit(start_game1, (70, 50))
-			screen.blit(smile, (170, h//2 - 80))
-			screen.blit(start_game2, (100, h-100))
-		else:
-			show_points()
-			user_choice = guess_user_choice(hand_frame)
-			user_choice_text = font.render(user_choice, False, white)
-			screen.blit(user_choice_text, (300, 50))
+	if not START_GAME:
+		start_game1 = font.render('Press any key', False, white)
+		smile = countdown_font.render(":)", False, white)
+		start_game2 = font.render('to START', False, white)
+		screen.blit(start_game1, (70, 50))
+		screen.blit(smile, (170, h//2 - 80))
+		screen.blit(start_game2, (100, h-100))
+	else:
+		show_points()
+		hand_frame, user_choice = guess_user_choice(hand_frame)
+		user_choice_text = font.render(user_choice, False, white)
+		screen.blit(user_choice_text, (300, 50))
 
-			if not countdown_started:
-				start_ticks=pygame.time.get_ticks()
-			countdown_started, secs = start_countdown(start_ticks)
+		if not countdown_started:
+			start_ticks=pygame.time.get_ticks()
+		countdown_started, secs = start_countdown(start_ticks)
 
-			if secs >= 3.99:
-				start_ticks = pygame.time.get_ticks()
-				computer_choice, computer_choice_img = show_computer_choice()
-				GAME_ON, USER_POINTS, COMPUTER_POINTS, VERDICT = compare_signs(user_choice, computer_choice, GAME_ON, USER_POINTS, COMPUTER_POINTS)
-				secs2 = 0
-				while secs2 < 4:
-					screen.blit(computer_choice_img, (145, 140))
-					screen.blit(VERDICT, (60, 50))
-					pygame.display.update()
+		if secs >= 3.99:
+			start_ticks = pygame.time.get_ticks()
+			computer_choice, computer_choice_img = show_computer_choice()
+			GAME_ON, USER_POINTS, COMPUTER_POINTS, VERDICT = compare_signs(user_choice, computer_choice, GAME_ON, USER_POINTS, COMPUTER_POINTS)
+			secs2 = 0
+			while secs2 < 4:
+				screen.blit(computer_choice_img, (145, 140))
+				screen.blit(VERDICT, (60, 50))
+				pygame.display.update()
 
-					secs2 += .001
+				secs2 += .001
 
 
-		pygame.display.update()
+	pygame.display.update()
 
-		for event in pygame.event.get():
-			if event.type == KEYDOWN:
-				if event.key == pygame.K_q:
-					sys.exit(0)
-				else:
-					START_GAME = True
+	cv2.imshow("hand", hand_frame)
 
+	for event in pygame.event.get():
+		if event.type == KEYDOWN:
+			if event.key == pygame.K_q:
+				GAME_ON = False
+			else:
+				START_GAME = True
+				
 pygame.quit()
-cv2.destroyAllWindows()
 camera.release()
+cv2.destroyAllWindows()
 sys.exit(0)
