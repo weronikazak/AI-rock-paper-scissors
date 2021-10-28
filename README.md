@@ -20,9 +20,6 @@ Trained on 5 different gestures:
 
 ## Performance:
 
-<p align="center">
-  <img src="https://github.com/weronikazak/AI-rock-paper-scissors/blob/master/examples/loss.PNG">
-</p>
 
 Although the loss function looks pretty good, the detector behaves chaotic at times, e. g. detecting a face instead of a hand. I think that expanding the dataset and making it more various in terms of lighting and surrounding will solve that problem.
 
@@ -31,10 +28,6 @@ Although the loss function looks pretty good, the detector behaves chaotic at ti
 </p>
 
 <b>Find more examples <a href="https://github.com/weronikazak/AI-rock-paper-scissors/tree/master/examples">here</a>.</b>
-
-
-
--------
 
 
 
